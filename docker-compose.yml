@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # MySQL Database Service
+  mysql_db:
+    image: mysql:8.0
+    container_name: kaamsetu_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-Ritesh@07}
+      MYSQL_DATABASE: kaamsetu_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 10
+
+  # Spring Boot Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kaamsetu_backend
+    restart: always
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+    environment:
+      PORT: 8085
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql_db:3306/kaamsetu_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${DB_ROOT_PASSWORD:-Ritesh@07}
+      JPA_DDL_AUTO: update
+      JWT_SECRET: ${JWT_SECRET:-KaamSetuSuperSecureKeyWithHighEntropyForHmacSha256AlgorithmMustBeAtLeast256BitsLong!}
+      CORS_ALLOWED_ORIGINS: "*"
+    ports:
+      - "8085:8085"
+
+  # React Frontend Service (Nginx SPA Reverse Proxy)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kaamsetu_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  mysql_data:
+    driver: local
+
