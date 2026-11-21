@@ -67,7 +67,7 @@ export const EmergencySosModal = ({ isOpen, onClose }) => {
 
   const handleDispatch = async () => {
     if (!isAuthenticated) {
-      alert('Please log in with the 1-click Demo Bar or create an account to dispatch an emergency worker.');
+      alert('Please log in or create an account to dispatch an emergency worker.');
       return;
     }
 

@@ -32,7 +32,7 @@ export const BookingModal = ({ worker, customerCoords, isOpen, onClose, onBookin
     setError('');
 
     if (!isAuthenticated) {
-      setError('Please sign in or use the quick Demo Switcher in the top bar to book.');
+      setError('Please sign in to your account to book a service provider.');
       return;
     }
 

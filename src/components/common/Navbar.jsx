@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export const Navbar = () => {
-  const { user, isAuthenticated, isCustomer, isWorker, isAdmin, logout, demoLogin } = useAuth();
+  const { user, isAuthenticated, isCustomer, isWorker, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -71,17 +71,6 @@ export const Navbar = () => {
     setProfileDropdownOpen(false);
   };
 
-  const handleDemoSwitch = async (role) => {
-    try {
-      await demoLogin(role);
-      if (role === 'customer') navigate('/customer/dashboard');
-      else if (role === 'worker') navigate('/worker/dashboard');
-      else if (role === 'admin') navigate('/admin/dashboard');
-    } catch (e) {
-      console.error('Demo login failed', e);
-    }
-  };
-
   const getDashboardPath = () => {
     if (isAdmin) return '/admin/dashboard';
     if (isWorker) return '/worker/dashboard';
@@ -90,33 +79,20 @@ export const Navbar = () => {
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200">
-      {/* Top Demo Bar for Easy Testing */}
-      <div className="bg-slate-900 text-slate-300 text-xs py-1.5 px-4 hidden sm:flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span><strong>Quick Demo Roles:</strong> Click to switch identity instantly:</span>
+      {/* Top Support & Trust Strip */}
+      <div className="bg-slate-900 text-slate-300 text-[11px] py-1.5 px-4 hidden sm:flex justify-between items-center border-b border-slate-800">
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            Verified Local Technicians Across Delhi NCR
+          </span>
+          <span className="text-slate-600">•</span>
+          <span>Zero Platform Commission on Direct Bookings</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleDemoSwitch('customer')}
-            className={`px-2 py-0.5 rounded transition ${isCustomer ? 'bg-brand-500 text-white font-semibold' : 'hover:bg-slate-800 text-slate-300'}`}
-          >
-            👤 Customer (Rahul)
-          </button>
+        <div className="flex items-center gap-4 text-slate-400">
+          <span>📞 Helpline: <strong className="text-white">+91 98711 00221</strong></span>
           <span className="text-slate-600">|</span>
-          <button
-            onClick={() => handleDemoSwitch('worker')}
-            className={`px-2 py-0.5 rounded transition ${isWorker ? 'bg-brand-500 text-white font-semibold' : 'hover:bg-slate-800 text-slate-300'}`}
-          >
-            🔧 Worker (Rajesh - Plumber)
-          </button>
-          <span className="text-slate-600">|</span>
-          <button
-            onClick={() => handleDemoSwitch('admin')}
-            className={`px-2 py-0.5 rounded transition ${isAdmin ? 'bg-brand-500 text-white font-semibold' : 'hover:bg-slate-800 text-slate-300'}`}
-          >
-            🛡️ Admin Dashboard
-          </button>
+          <span className="text-emerald-400 font-semibold">100% Verified Aadhaar KYC</span>
         </div>
       </div>
 
@@ -335,27 +311,6 @@ export const Navbar = () => {
       {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t border-slate-200 bg-white px-4 pt-3 pb-5 space-y-3">
-          <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-lg text-center text-xs">
-            <button
-              onClick={() => { handleDemoSwitch('customer'); setMobileMenuOpen(false); }}
-              className="py-1 rounded font-medium hover:bg-white"
-            >
-              Customer
-            </button>
-            <button
-              onClick={() => { handleDemoSwitch('worker'); setMobileMenuOpen(false); }}
-              className="py-1 rounded font-medium hover:bg-white"
-            >
-              Worker
-            </button>
-            <button
-              onClick={() => { handleDemoSwitch('admin'); setMobileMenuOpen(false); }}
-              className="py-1 rounded font-medium hover:bg-white"
-            >
-              Admin
-            </button>
-          </div>
-
           <Link
             to="/workers"
             onClick={() => setMobileMenuOpen(false)}

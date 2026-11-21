@@ -4,6 +4,8 @@ import { api } from '../services/api';
 import { StarRating } from '../components/common/StarRating';
 import { Badge } from '../components/common/Badge';
 import { BookingModal } from '../components/common/BookingModal';
+import { LocationPermissionBanner } from '../components/common/LocationPermissionBanner';
+import { detectLocationWithFallback, DEFAULT_HUBS } from '../services/locationService';
 import { 
   Filter, 
   Search, 
@@ -24,15 +26,7 @@ import {
   Clock
 } from 'lucide-react';
 
-const PRESET_CUSTOMER_LOCATIONS = [
-  { name: 'Hauz Khas Enclave, South Delhi', lat: 28.5494, lon: 77.2001 },
-  { name: 'Malviya Nagar, South Delhi', lat: 28.5355, lon: 77.2100 },
-  { name: 'Connaught Place, Central Delhi', lat: 28.6304, lon: 77.2177 },
-  { name: 'Rajouri Garden, West Delhi', lat: 28.6415, lon: 77.1209 },
-  { name: 'Sector 62, Noida', lat: 28.6270, lon: 77.3620 },
-  { name: 'Sector 18 Atta Market, Noida', lat: 28.5700, lon: 77.3200 },
-  { name: 'DLF Cyber City, Gurugram', lat: 28.4900, lon: 77.0900 }
-];
+const PRESET_CUSTOMER_LOCATIONS = DEFAULT_HUBS;
 
 export const WorkerSearchPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -51,6 +45,8 @@ export const WorkerSearchPage = () => {
   });
   const [detectingGPS, setDetectingGPS] = useState(false);
   const [maxDistanceKm, setMaxDistanceKm] = useState('');
+  const [locationSource, setLocationSource] = useState('DEFAULT');
+  const [showLocationPermissionHelp, setShowLocationPermissionHelp] = useState(false);
 
   // Filters state
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
@@ -101,28 +97,28 @@ export const WorkerSearchPage = () => {
     }
   };
 
-  const handleDetectGPS = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
-      return;
+  const handleDetectGPS = async () => {
+    try {
+      setDetectingGPS(true);
+      const res = await detectLocationWithFallback({
+        lat: customerLocation.lat,
+        lon: customerLocation.lon,
+        name: customerLocation.name
+      });
+
+      setLocationSource(res.source);
+      setShowLocationPermissionHelp(res.permissionDenied);
+
+      setCustomerLocation({
+        name: res.locationName,
+        lat: res.latitude,
+        lon: res.longitude
+      });
+    } catch (err) {
+      console.warn('GPS detection error:', err);
+    } finally {
+      setDetectingGPS(false);
     }
-    setDetectingGPS(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setDetectingGPS(false);
-        const { latitude, longitude } = pos.coords;
-        setCustomerLocation({
-          name: `GPS Detected (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`,
-          lat: +latitude.toFixed(4),
-          lon: +longitude.toFixed(4)
-        });
-      },
-      (err) => {
-        setDetectingGPS(false);
-        alert('Could not get GPS position: ' + err.message + '. You can choose a locality from the dropdown.');
-      },
-      { timeout: 8000 }
-    );
   };
 
   const handleResetFilters = () => {
@@ -200,54 +196,64 @@ export const WorkerSearchPage = () => {
       </div>
 
       {/* Customer Location & Proximity Bar (Uber/Ola Style) */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-5 rounded-3xl shadow-xl border border-slate-700/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-orange-500/20 text-brand-400 flex items-center justify-center shrink-0 border border-brand-500/30">
-            <Radio className="w-5 h-5 animate-pulse text-brand-400" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-brand-400">
-                Your Current Service Location
-              </span>
-              <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] px-2 py-0.5 rounded-full font-mono">
-                GPS MATCHING ACTIVE
-              </span>
+      <div className="space-y-3">
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-5 rounded-3xl shadow-xl border border-slate-700/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-orange-500/20 text-brand-400 flex items-center justify-center shrink-0 border border-brand-500/30">
+              <Radio className="w-5 h-5 animate-pulse text-brand-400" />
             </div>
-            <p className="text-sm font-bold text-white mt-0.5">
-              📍 {customerLocation.name}
-            </p>
-            <p className="text-[11px] font-mono text-slate-400">
-              Coords: [{customerLocation.lat}, {customerLocation.lon}] • Showing nearest available technicians first
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-brand-400">
+                  Your Current Service Location
+                </span>
+                <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] px-2 py-0.5 rounded-full font-mono">
+                  GPS MATCHING ACTIVE
+                </span>
+              </div>
+              <p className="text-sm font-bold text-white mt-0.5">
+                📍 {customerLocation.name}
+              </p>
+              <p className="text-[11px] font-mono text-slate-400">
+                Coords: [{customerLocation.lat}, {customerLocation.lon}] • Showing nearest available technicians first
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+            <button
+              onClick={handleDetectGPS}
+              disabled={detectingGPS}
+              className="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-md shadow-brand-600/30 flex items-center gap-1.5 transition disabled:opacity-50"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              <span>{detectingGPS ? 'Detecting GPS...' : 'Use My GPS'}</span>
+            </button>
+
+            <select
+              value={customerLocation.name}
+              onChange={(e) => {
+                const loc = PRESET_CUSTOMER_LOCATIONS.find((l) => l.name === e.target.value);
+                if (loc) setCustomerLocation(loc);
+              }}
+              className="text-xs font-semibold bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
+            >
+              {PRESET_CUSTOMER_LOCATIONS.map((loc) => (
+                <option key={loc.name} value={loc.name} className="bg-slate-900 text-white">
+                  📍 {loc.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          <button
-            onClick={handleDetectGPS}
-            disabled={detectingGPS}
-            className="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold shadow-md shadow-brand-600/30 flex items-center gap-1.5 transition disabled:opacity-50"
-          >
-            <Navigation className="w-3.5 h-3.5" />
-            <span>{detectingGPS ? 'Detecting GPS...' : 'Use My GPS'}</span>
-          </button>
-
-          <select
-            value={customerLocation.name}
-            onChange={(e) => {
-              const loc = PRESET_CUSTOMER_LOCATIONS.find((l) => l.name === e.target.value);
-              if (loc) setCustomerLocation(loc);
-            }}
-            className="text-xs font-semibold bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer"
-          >
-            {PRESET_CUSTOMER_LOCATIONS.map((loc) => (
-              <option key={loc.name} value={loc.name} className="bg-slate-900 text-white">
-                📍 {loc.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {showLocationPermissionHelp && (
+          <LocationPermissionBanner
+            currentSource={locationSource}
+            onRetry={handleDetectGPS}
+            onDismiss={() => setShowLocationPermissionHelp(false)}
+          />
+        )}
       </div>
 
       {/* Main Layout: Filters Sidebar + Results Grid */}

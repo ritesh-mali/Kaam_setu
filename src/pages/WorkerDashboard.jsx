@@ -6,21 +6,23 @@ import { Badge } from '../components/common/Badge';
 import { StarRating } from '../components/common/StarRating';
 import { InvoiceModal } from '../components/common/InvoiceModal';
 import { ChatModal } from '../components/common/ChatModal';
-import { 
-  Briefcase, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  Power, 
-  MapPin, 
-  Phone, 
-  KeyRound, 
-  Receipt, 
-  Star, 
-  Wrench, 
-  Sliders, 
-  MessageSquare, 
-  Save, 
+import { LocationPermissionBanner } from '../components/common/LocationPermissionBanner';
+import { detectLocationWithFallback, DEFAULT_HUBS } from '../services/locationService';
+import {
+  Briefcase,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Power,
+  MapPin,
+  Phone,
+  KeyRound,
+  Receipt,
+  Star,
+  Wrench,
+  Sliders,
+  MessageSquare,
+  Save,
   AlertTriangle,
   Send,
   Compass,
@@ -29,18 +31,7 @@ import {
   Bike
 } from 'lucide-react';
 
-const PRESET_LOCATIONS = [
-  { name: 'Malviya Nagar Main Market, South Delhi', lat: 28.5355, lon: 77.2100 },
-  { name: 'Hauz Khas Enclave, South Delhi', lat: 28.5494, lon: 77.2001 },
-  { name: 'Saket District Centre, South Delhi', lat: 28.5283, lon: 77.2190 },
-  { name: 'Connaught Place, Central Delhi', lat: 28.6304, lon: 77.2177 },
-  { name: 'Rajouri Garden, West Delhi', lat: 28.6415, lon: 77.1209 },
-  { name: 'Karol Bagh Metro Gate 2, Central Delhi', lat: 28.6517, lon: 77.1906 },
-  { name: 'Sector 18 Atta Market, Noida', lat: 28.5700, lon: 77.3200 },
-  { name: 'Sector 62 Institutional Area, Noida', lat: 28.6270, lon: 77.3620 },
-  { name: 'Cyber Hub DLF Phase 2, Gurugram', lat: 28.4900, lon: 77.0900 },
-  { name: 'Indirapuram, Ghaziabad', lat: 28.6444, lon: 77.3719 }
-];
+const PRESET_LOCATIONS = DEFAULT_HUBS;
 
 export const WorkerDashboard = () => {
   const { user, isWorker, isAuthenticated } = useAuth();
@@ -56,6 +47,8 @@ export const WorkerDashboard = () => {
   const [updatingLocation, setUpdatingLocation] = useState(false);
   const [locationSuccessMsg, setLocationSuccessMsg] = useState('');
   const [simulatingBookingId, setSimulatingBookingId] = useState(null);
+  const [locationSource, setLocationSource] = useState('DEFAULT');
+  const [showLocationPermissionHelp, setShowLocationPermissionHelp] = useState(false);
 
   // Chat modal state
   const [selectedChatBooking, setSelectedChatBooking] = useState(null);
@@ -163,27 +156,24 @@ export const WorkerDashboard = () => {
     }
   };
 
-  const handleDetectGPS = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser');
-      return;
+  const handleDetectGPS = async () => {
+    try {
+      setUpdatingLocation(true);
+      const res = await detectLocationWithFallback({
+        lat: profile?.latitude || 28.5355,
+        lon: profile?.longitude || 77.2100,
+        name: profile?.currentLocationName || 'Malviya Nagar, South Delhi'
+      });
+
+      setLocationSource(res.source);
+      setShowLocationPermissionHelp(res.permissionDenied);
+
+      await handleUpdateWorkerLocation(res.latitude, res.longitude, res.locationName);
+    } catch (err) {
+      console.warn('GPS detection error:', err);
+    } finally {
+      setUpdatingLocation(false);
     }
-    setUpdatingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        handleUpdateWorkerLocation(
-          +latitude.toFixed(4),
-          +longitude.toFixed(4),
-          `Live GPS Fix (${latitude.toFixed(3)}, ${longitude.toFixed(3)})`
-        );
-      },
-      (err) => {
-        setUpdatingLocation(false);
-        alert('Could not access GPS: ' + err.message + '. Please pick a locality from the dropdown.');
-      },
-      { timeout: 8000 }
-    );
   };
 
   // Live Trip Simulation (Uber/Ola Drive to Customer)
@@ -371,11 +361,10 @@ export const WorkerDashboard = () => {
 
           <button
             onClick={handleToggleAvailability}
-            className={`p-3 rounded-xl transition-all shadow-md ${
-              profile?.available
+            className={`p-3 rounded-xl transition-all shadow-md ${profile?.available
                 ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/30'
                 : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-            }`}
+              }`}
             title="Click to toggle availability"
           >
             <Power className="w-5 h-5" />
@@ -447,6 +436,14 @@ export const WorkerDashboard = () => {
             {locationSuccessMsg}
           </div>
         )}
+
+        {showLocationPermissionHelp && (
+          <LocationPermissionBanner
+            currentSource={locationSource}
+            onRetry={handleDetectGPS}
+            onDismiss={() => setShowLocationPermissionHelp(false)}
+          />
+        )}
       </div>
 
       {/* KPI Stats Grid */}
@@ -483,9 +480,8 @@ export const WorkerDashboard = () => {
       <div className="flex border-b border-slate-200 text-sm font-semibold text-slate-500 gap-6 overflow-x-auto">
         <button
           onClick={() => setActiveTab('requests')}
-          className={`pb-3 relative transition flex items-center gap-1.5 whitespace-nowrap ${
-            activeTab === 'requests' ? 'text-brand-600 font-bold' : 'hover:text-slate-800'
-          }`}
+          className={`pb-3 relative transition flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'requests' ? 'text-brand-600 font-bold' : 'hover:text-slate-800'
+            }`}
         >
           <span>Incoming Requests</span>
           {pendingRequests.length > 0 && (
@@ -498,9 +494,8 @@ export const WorkerDashboard = () => {
 
         <button
           onClick={() => setActiveTab('active')}
-          className={`pb-3 relative transition flex items-center gap-1.5 whitespace-nowrap ${
-            activeTab === 'active' ? 'text-brand-600 font-bold' : 'hover:text-slate-800'
-          }`}
+          className={`pb-3 relative transition flex items-center gap-1.5 whitespace-nowrap ${activeTab === 'active' ? 'text-brand-600 font-bold' : 'hover:text-slate-800'
+            }`}
         >
           <span>Active & Scheduled ({activeJobs.length})</span>
           {activeTab === 'active' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-600"></span>}
@@ -508,9 +503,8 @@ export const WorkerDashboard = () => {
 
         <button
           onClick={() => setActiveTab('completed')}
-          className={`pb-3 relative transition whitespace-nowrap ${
-            activeTab === 'completed' ? 'text-brand-600 font-bold' : 'hover:text-slate-800'
-          }`}
+          className={`pb-3 relative transition whitespace-nowrap ${activeTab === 'completed' ? 'text-brand-600 font-bold' : 'hover:text-slate-800'
+            }`}
         >
           Completed Records ({completedJobs.length})
           {activeTab === 'completed' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-600"></span>}
@@ -518,9 +512,8 @@ export const WorkerDashboard = () => {
 
         <button
           onClick={() => setActiveTab('settings')}
-          className={`pb-3 relative transition whitespace-nowrap ${
-            activeTab === 'settings' ? 'text-brand-600 font-bold' : 'hover:text-slate-800'
-          }`}
+          className={`pb-3 relative transition whitespace-nowrap ${activeTab === 'settings' ? 'text-brand-600 font-bold' : 'hover:text-slate-800'
+            }`}
         >
           Rate Card & Profile
           {activeTab === 'settings' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-600"></span>}
@@ -528,9 +521,8 @@ export const WorkerDashboard = () => {
 
         <button
           onClick={() => setActiveTab('reviews')}
-          className={`pb-3 relative transition whitespace-nowrap ${
-            activeTab === 'reviews' ? 'text-brand-600 font-bold' : 'hover:text-slate-800'
-          }`}
+          className={`pb-3 relative transition whitespace-nowrap ${activeTab === 'reviews' ? 'text-brand-600 font-bold' : 'hover:text-slate-800'
+            }`}
         >
           Reviews & Feedback ({reviews.length})
           {activeTab === 'reviews' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-600"></span>}
@@ -690,11 +682,10 @@ export const WorkerDashboard = () => {
                             setSimulatingBookingId(b.id);
                           }
                         }}
-                        className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md ${
-                          simulatingBookingId === b.id
+                        className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md ${simulatingBookingId === b.id
                             ? 'bg-amber-500 hover:bg-amber-600 text-white animate-pulse'
                             : 'bg-brand-600 hover:bg-brand-500 text-white'
-                        }`}
+                          }`}
                       >
                         <Bike className="w-3.5 h-3.5" />
                         <span>
